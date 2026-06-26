@@ -49,21 +49,14 @@ if st.sidebar.button("Login"):
 @st.cache_resource
 def load_all_models():
     try:
-        nlp_model = joblib.load("nlp_model.pkl")
-        vectorizer = joblib.load("vectorizer.pkl")
-        url_model = joblib.load("best_model.pkl")
+        # Added "models/" back to the beginning of these three lines!
+        nlp_model = joblib.load("models/nlp_model.pkl")
+        vectorizer = joblib.load("models/vectorizer.pkl")
+        url_model = joblib.load("models/best_model.pkl")
         return nlp_model, vectorizer, url_model
     except Exception as e:
         st.error(f"Failed to load AI files. Error: {e}")
         return None, None, None
-
-nlp_model, vectorizer, url_model = load_all_models()
-
-def url_nlp_scanner(url):
-    suspicious_words = ['verify', 'login', 'update', 'bank', 'secure', 'confirm', 'account', 'paypal']
-    url_lower = url.lower()
-    return [word for word in suspicious_words if word in url_lower]
-
 # --- 4. Main App UI ---
 st.title("🛡️ PhishGuard: Dual-Engine Detection System")
 st.markdown("Choose the type of content you want to scan using the tabs below.")
