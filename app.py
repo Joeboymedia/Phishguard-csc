@@ -49,7 +49,6 @@ if st.sidebar.button("Login"):
 @st.cache_resource
 def load_all_models():
     try:
-        # Added "models/" back to the beginning of these three lines!
         nlp_model = joblib.load("models/nlp_model.pkl")
         vectorizer = joblib.load("models/vectorizer.pkl")
         url_model = joblib.load("models/best_model.pkl")
@@ -57,6 +56,9 @@ def load_all_models():
     except Exception as e:
         st.error(f"Failed to load AI files. Error: {e}")
         return None, None, None
+
+# CRITICAL FIX: This line MUST be here, perfectly aligned to the left!
+nlp_model, vectorizer, url_model = load_all_models()
 # --- 4. Main App UI ---
 st.title("🛡️ PhishGuard: Dual-Engine Detection System")
 st.markdown("Choose the type of content you want to scan using the tabs below.")
@@ -67,7 +69,6 @@ tab1, tab2 = st.tabs(["📧 Email & SMS Scanner (NLP)", "🌐 URL Scanner (ML + 
 with tab1:
     st.subheader("Text-Based Social Engineering Detection")
     user_text = st.text_area("Message Content:", height=150, placeholder="Paste the suspicious email or text message here...")
-    
     if st.button("Scan Message"):
         if not user_text.strip():
             st.warning("Please paste some text to analyze.")
