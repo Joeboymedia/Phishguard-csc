@@ -2,11 +2,15 @@ import streamlit as st
 import joblib
 import pandas as pd
 from feature_extractor import extract_features
+from datetime import datetime
 
 # --- 1. Setup & Configuration ---
 st.set_page_config(page_title="PhishGuard Dual Engine", page_icon="🛡️", layout="wide")
 
-# Feature names for the URL ML Model to prevent warnings
+# Initialize Live System Memory for Logs
+if 'scan_logs' not in st.session_state:
+    st.session_state.scan_logs = []
+
 FEATURE_NAMES = [
     'having_IP_Address', 'URL_Length', 'Shortining_Service', 'having_At_Symbol', 
     'double_slash_redirecting', 'Prefix_Suffix', 'having_Sub_Domain', 'SSLfinal_State', 
@@ -24,10 +28,20 @@ username = st.sidebar.text_input("Username")
 password = st.sidebar.text_input("Password", type="password")
 
 if st.sidebar.button("Login"):
-    # Hardcoded credentials for project demonstration
     if username == "admin" and password == "admin123":
         st.sidebar.success("Logged in successfully!")
-        st.sidebar.info("System Logs: \n- Text Scan 1: Safe\n- URL Scan 1: Phishing\n*(Database connection goes here)*")
+        st.sidebar.markdown("### 📡 Live System Logs")
+        
+        # Display the real logs from memory
+        if len(st.session_state.scan_logs) == 0:
+            st.sidebar.info("No scans have been performed in this session yet.")
+        else:
+            # Show the most recent scans at the top
+            for log in reversed(st.session_state.scan_logs):
+                if "PHISHING" in log:
+                    st.sidebar.error(log)
+                else:
+                    st.sidebar.success(log)
     else:
         st.sidebar.error("Invalid credentials")
 
@@ -35,11 +49,9 @@ if st.sidebar.button("Login"):
 @st.cache_resource
 def load_all_models():
     try:
-        # NLP Models (for Emails/SMS)
-        nlp_model = joblib.load("models/nlp_model.pkl")
-        vectorizer = joblib.load("models/vectorizer.pkl")
-        # ML Model (for URLs)
-        url_model = joblib.load("models/best_model.pkl")
+        nlp_model = joblib.load("nlp_model.pkl")
+        vectorizer = joblib.load("vectorizer.pkl")
+        url_model = joblib.load("best_model.pkl")
         return nlp_model, vectorizer, url_model
     except Exception as e:
         st.error(f"Failed to load AI files. Error: {e}")
@@ -47,7 +59,6 @@ def load_all_models():
 
 nlp_model, vectorizer, url_model = load_all_models()
 
-# Mini NLP scanner specifically for catching bad words inside URLs
 def url_nlp_scanner(url):
     suspicious_words = ['verify', 'login', 'update', 'bank', 'secure', 'confirm', 'account', 'paypal']
     url_lower = url.lower()
@@ -57,7 +68,6 @@ def url_nlp_scanner(url):
 st.title("🛡️ PhishGuard: Dual-Engine Detection System")
 st.markdown("Choose the type of content you want to scan using the tabs below.")
 
-# Create the Tabs
 tab1, tab2 = st.tabs(["📧 Email & SMS Scanner (NLP)", "🌐 URL Scanner (ML + Hybrid)"])
 
 # ====== TAB 1: TEXT SCANNER ======
@@ -74,14 +84,19 @@ with tab1:
             with st.spinner("Analyzing linguistic patterns..."):
                 text_features = vectorizer.transform([user_text])
                 prediction = nlp_model.predict(text_features)[0]
+                time_now = datetime.now().strftime("%H:%M:%S")
                 
                 st.divider()
                 if prediction == 0:
                     st.error("### 🚨 VERDICT: PHISHING DETECTED")
                     st.markdown("This message contains linguistic patterns highly consistent with social engineering and fraud.")
+                    # Save to Live Log
+                    st.session_state.scan_logs.append(f"[{time_now}] Text Scan: PHISHING")
                 else:
                     st.success("### ✅ VERDICT: SAFE")
                     st.markdown("No significant phishing indicators were detected in the text of this message.")
+                    # Save to Live Log
+                    st.session_state.scan_logs.append(f"[{time_now}] Text Scan: SAFE")
 
 # ====== TAB 2: URL SCANNER ======
 with tab2:
@@ -95,33 +110,26 @@ with tab2:
             st.error("URL ML engine is offline.")
         else:
             with st.spinner("Extracting structural features..."):
-                # 1. NLP Keyword check for URL
                 found_words = url_nlp_scanner(url_input)
                 nlp_flag = len(found_words) > 0
                 
-                # 2. Mathematical feature extraction
                 features = extract_features(url_input)
                 features_df = pd.DataFrame(features, columns=FEATURE_NAMES)
                 
-                # Check critical structural flaws directly (Feature 0 is the IP Address check)
                 critical_structural_flaw = (features[0][0] == -1) 
                 
                 ml_result = url_model.predict(features_df)[0]
                 ml_flag = (ml_result != 1) 
+                time_now = datetime.now().strftime("%H:%M:%S")
                 
                 st.divider()
-                
-                # If the ML flags it, the NLP flags it, OR a critical flaw (like an IP) is found
                 if ml_flag or nlp_flag or critical_structural_flaw:
                     st.error("### 🚨 VERDICT: PHISHING DETECTED")
                     st.markdown("This URL is highly suspicious and should be avoided.")
-                    with st.expander("See technical details"):
-                        if ml_flag:
-                            st.write("- **Machine Learning Flag:** The URL structure matches known phishing patterns.")
-                        if critical_structural_flaw:
-                            st.write("- **Structural Flag:** Use of a direct IP Address instead of a standard domain.")
-                        if nlp_flag:
-                            st.write(f"- **NLP Flag:** Found suspicious keywords: `{', '.join(found_words)}`")
+                    # Save to Live Log
+                    st.session_state.scan_logs.append(f"[{time_now}] URL Scan ({url_input[:20]}...): PHISHING")
                 else:
                     st.success("### ✅ VERDICT: SAFE")
                     st.markdown("No significant threats were detected in this URL by either the ML model or the NLP scanner.")
+                    # Save to Live Log
+                    st.session_state.scan_logs.append(f"[{time_now}] URL Scan ({url_input[:20]}...): SAFE")
