@@ -59,6 +59,13 @@ def load_all_models():
 
 # CRITICAL FIX: This line MUST be here, perfectly aligned to the left!
 nlp_model, vectorizer, url_model = load_all_models()
+
+# Mini NLP scanner specifically for catching bad words inside URLs
+def url_nlp_scanner(url):
+    suspicious_words = ['verify', 'login', 'update', 'bank', 'secure', 'confirm', 'account', 'paypal']
+    url_lower = url.lower()
+    return [word for word in suspicious_words if word in url_lower]
+    
 # --- 4. Main App UI ---
 st.title("🛡️ PhishGuard: Dual-Engine Detection System")
 st.markdown("Choose the type of content you want to scan using the tabs below.")
